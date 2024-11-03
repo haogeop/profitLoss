@@ -1,26 +1,31 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Button } from "@mui/material"
 import * as d3 from 'd3'
 import "./index.scss"
 
-const ProfitLoss = () => {
+interface ProfitLossProps {
+    strikePrice?: number // 行权价格
+    optionPrice?: number // 期权合约价格
+    curPrice?: number // 目前现货价格
+}
+
+// 边距 尺寸
+const margin = { top: 20, right: 30, bottom: 30, left: 40 } 
+const width = 600 - margin.left - margin.right;
+const height = 200 - margin.top - margin.bottom;
+
+const ProfitLoss = ({strikePrice, optionPrice, curPrice}: ProfitLossProps) => {
     const svgRef = useRef()
     // const [data, setData] = useState([])
-    const [hoveredPrice, setHoveredPrice] = useState(null);
-    const [hoveredProfitLoss, setHoveredProfitLoss] = useState(null);
-    const [isAction, setIsAction] = useState(false)
-    const [profitStatus, setProfitStatus] = useState(null)
+    const [hoveredPrice, setHoveredPrice] = useState<number | null>(null);
+    const [hoveredProfitLoss, setHoveredProfitLoss] = useState<number | null>(null);
+    const [isAction, setIsAction] = useState<boolean>(false)
+    const [profitStatus, setProfitStatus] = useState<null | 'positive' | 'negative'>(null)
 
-    // 边距 尺寸
-    const margin = { top: 20, right: 30, bottom: 30, left: 40 } 
-    const width = 600 - margin.left - margin.right;
-    const height = 200 - margin.top - margin.bottom;
 
     // 参数定义
-    const strikePrice = 700; // 行权价格
-    const optionPrice = 100 // 期权合约价格
-    const breakeven = strikePrice + optionPrice // 盈亏平衡点
-    const maxPrice = strikePrice * 3 // 最大现货价格
+    const breakeven = useMemo(() => ( Number(strikePrice) + Number(optionPrice) ), [strikePrice, optionPrice]) // 盈亏平衡点
+    const maxPrice = useMemo(() => ( Number(strikePrice) * 3 ), [strikePrice]) // 最大现货价格
     const maxProfit = maxPrice - breakeven
 
     const ProfitNumberStyle = {
@@ -40,7 +45,7 @@ const ProfitLoss = () => {
             const profitLoss = price >= strikePrice ? price - breakeven : -optionPrice
             return {price, profitLoss} // {x, y}
         })
-        console.log('data', data)
+        setHoveredPrice(curPrice)
         
         // 设置 x 轴和 y 轴的范围
         const xScale = d3.scaleLinear()
@@ -91,6 +96,17 @@ const ProfitLoss = () => {
             .attr('stroke', 'rgb(255 86 8)')
             .attr('stroke-width', 4);
 
+        // Now MEOW Price
+        if(curPrice && curPrice <= maxPrice) {
+            svg.append('line')
+                .attr('x1', xScale(curPrice))
+                .attr('x2', xScale(curPrice))
+                .attr('y1', yScale(-maxProfit))
+                .attr('y2', yScale(maxProfit))
+                .attr('stroke', 'rgb(198 203 205)')
+                .attr('stroke-width', 1)
+        }
+
         // 绘制边界
         svg.append('line')
             .attr('x1', 0)
@@ -124,7 +140,6 @@ const ProfitLoss = () => {
          const maxProfitPoint = data[data.length - 1] // 最大现货价格对应的点
          const maxLossPoint = { price: strikePrice, profitLoss: -optionPrice}// 最大亏损点为 现货价格等于行权价格 亏损一个期权价格
 
-        console.log('zero', zeroProfitPoint)
         if(zeroProfitPoint) {
             svg.append('circle')
                .attr('cx', xScale(zeroProfitPoint.price))
@@ -154,10 +169,9 @@ const ProfitLoss = () => {
 
         // 鼠标移动事件
         svg.on('mousemove', (event) => {
-            console.log('event', d3.pointer(event))
             const [x] = d3.pointer(event)
             const price = Math.round(xScale.invert(x)) // 鼠标位置的x轴值
-            console.log('price', price)
+
             // 鼠标会获取到数据范围之外的位置
             if(price >= 0 && price <= maxPrice) {
                 setHoveredPrice(price)
@@ -171,7 +185,7 @@ const ProfitLoss = () => {
                 setHoveredProfitLoss(maxProfit)
             }
         })
-    }, [])
+    }, [strikePrice, optionPrice, curPrice])
 
     useEffect(() => {
         if(!hoveredProfitLoss || hoveredProfitLoss === 0 ) {
@@ -183,31 +197,7 @@ const ProfitLoss = () => {
         }
     }, [hoveredProfitLoss])
 
-    // useEffect(() => {
-    //     const svg = d3.select(svgRef.current)
-
-    //     console.log('hoveredPrice', hoveredPrice)
-    //     const circle = svg.append('circle')
-    //     if(hoveredPrice) {
-    //         const circle = svg.append('circle')
-    //             .attr('cx', `${40 + ((hoveredPrice / (strikePrice * 3)) * width)}px`)
-    //             .attr('cy', height / 2 + 20)
-    //             .attr('r', 20)
-    //             .attr('fill', 'rgba(0, 0, 255, 0.5)')
-    //             .attr('stroke', 'blue')
-    //             .attr('stroke-width', 2);
-    //         if(isAction) {
-    //             circle.transition().duration(500).attr('cy', height / 2 + 20).ease(d3.easeBounce)
-    //         } else {
-    //             circle.transition().attr('cy', height / 2 + 20)
-    //         }
-            
-    //     } else {
-    //         circle.remove()
-    //     }
-    // }, [hoveredPrice])
-
-    const handleButton = (price) => {
+    const handleButton = (price: number) => {
         setIsAction(true)
         setHoveredPrice(price)
         setHoveredProfitLoss(price - breakeven)
@@ -225,58 +215,60 @@ const ProfitLoss = () => {
                     {hoveredProfitLoss && `${hoveredProfitLoss > 0 ? '+' : `${hoveredProfitLoss < 0 ? '-' : null}`} $${Math.abs(hoveredProfitLoss)}`}
                 </span>
             </div>
-            <div style={{ position: 'relative' }}>
-                <svg ref={svgRef} />
-                <div className="button-group">
-                    <Button variant="text" onClick={() => handleButton(strikePrice)}>Max Loss</Button>
-                    <Button variant="text" onClick={() => handleButton(breakeven)}>Breakeven</Button>
-                    <Button variant="text" onClick={() => handleButton(maxPrice)}>Max Profit</Button>
-                </div>
-                {
-                    hoveredPrice !== null &&
-                    <div style={{ position: 'absolute', left: 0, top: 0 }}>
-                        <div
-                            className={`y-axis ${ isAction ? "move-action" : null}`}
-                            style={{
-                                left: `${40 + ((hoveredPrice / (strikePrice * 3)) * width)}px`,
-                                height: `${height}px`,
-                            }}
-                        />
-                         <div
-                            className={`${ isAction ? "move-action" : null}`}
-                            style={{
-                                position: 'absolute',
-                                width: '40px', // 设置圆的宽度
-                                height: '40px', // 设置圆的高度
-                                left: `${20 + ((hoveredPrice / (strikePrice * 3)) * width)}px`,
-                                top: `${height / 2}px`,
-                                backgroundColor: 'rgba(96, 220, 99, 0.5)',
-                                borderRadius: '50%',
-                                // boxSizing: 'border-box',
-                            }}      
-                        />
-                        <div
-                            className={`${ isAction ? "move-action" : null}`}
-                            style={{
-                                position: 'absolute',
-                                width: '60px', // 设置圆的宽度
-                                height: '60px', // 设置圆的高度
-                                left: `${10 + ((hoveredPrice / (strikePrice * 3)) * width)}px`,
-                                top: `${height / 2 - 10}px`,
-                                border: '2px solid rgb(96 220 99)',
-                                borderRadius: '50%',
-                                // boxSizing: 'border-box',
-                            }}      
-                        />
-                        <div
-                            style={{ left: `${((hoveredPrice / (strikePrice * 3)) * width) - 20}px` }}
-                            className="tooltip"
-                        >
-                            {<div className="tooltip-price">MEOW Price at Exp<br />{hoveredPrice === maxPrice ? "Unlimited" : `$${hoveredPrice}`}</div>}
-                        </div>
+            {strikePrice && optionPrice && (
+                <div style={{ position: 'relative' }}>
+                    <svg ref={svgRef} />
+                    <div className="button-group">
+                        <Button variant="text" onClick={() => handleButton(strikePrice)}>Max Loss</Button>
+                        <Button variant="text" onClick={() => handleButton(breakeven)}>Breakeven</Button>
+                        <Button variant="text" onClick={() => handleButton(maxPrice)}>Max Profit</Button>
                     </div>
-                }
-            </div>
+                    {
+                        hoveredPrice !== null &&
+                        <div style={{ position: 'absolute', left: 0, top: 0 }}>
+                            <div
+                                className={`y-axis ${ isAction ? "move-action" : null}`}
+                                style={{
+                                    left: `${40 + ((hoveredPrice / (strikePrice * 3)) * width)}px`,
+                                    height: `${height}px`,
+                                }}
+                            />
+                            <div
+                                className={`${ isAction ? "move-action" : null}`}
+                                style={{
+                                    position: 'absolute',
+                                    width: '40px', // 设置圆的宽度
+                                    height: '40px', // 设置圆的高度
+                                    left: `${20 + ((hoveredPrice / (strikePrice * 3)) * width)}px`,
+                                    top: `${height / 2}px`,
+                                    backgroundColor: 'rgba(96, 220, 99, 0.5)',
+                                    borderRadius: '50%',
+                                    // boxSizing: 'border-box',
+                                }}      
+                            />
+                            <div
+                                className={`${ isAction ? "move-action" : null}`}
+                                style={{
+                                    position: 'absolute',
+                                    width: '60px', // 设置圆的宽度
+                                    height: '60px', // 设置圆的高度
+                                    left: `${10 + ((hoveredPrice / (strikePrice * 3)) * width)}px`,
+                                    top: `${height / 2 - 10}px`,
+                                    border: '2px solid rgb(96 220 99)',
+                                    borderRadius: '50%',
+                                    // boxSizing: 'border-box',
+                                }}      
+                            />
+                            <div
+                                style={{ left: `${((hoveredPrice / (strikePrice * 3)) * width) - 20}px` }}
+                                className="tooltip"
+                            >
+                                {<div className="tooltip-price">MEOW Price at Exp<br />{hoveredPrice === maxPrice ? "Unlimited" : `$${hoveredPrice}`}</div>}
+                            </div>
+                        </div>
+                    }
+                </div>
+            )}
         </>
     )
 }
