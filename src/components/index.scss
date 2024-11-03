@@ -1,0 +1,51 @@
+.title {
+    display: "flex";
+    flex-direction: 'column';
+    text-align: center;
+    color: #000;
+    font-size: 22px;
+    min-height: 70px;
+    .price {
+        font-weight: 600;
+        font-size: 26px;
+    }
+    .positive {
+        color: rgba(96 220 99);
+    }
+    .negative {
+        color: #ff5608;
+    }
+}
+
+.button-group {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+}
+
+.move-action {
+    transition: left 0.5s ease;
+}
+
+.y-axis {
+    position: absolute;
+    top: 20px;
+    width: 2px;
+    background-color: #000;
+    pointer-events: none;
+}
+
+.tooltip {
+    position: absolute;
+    top: -40px;
+    width: 200px;
+    color: #000;
+    padding: 2px 5px;
+    border-radius: 3px;
+}
+
+.tooltip-price {
+    text-align: center;
+    font-weight: 600; 
+    font-size: 18px 
+}
